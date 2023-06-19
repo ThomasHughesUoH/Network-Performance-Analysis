@@ -1,0 +1,140 @@
+import unittest
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+from sklearn.preprocessing import StandardScaler
+from scipy.stats import norm
+
+class NetworkAnalyser:
+    def __init__(self, data_file):
+        self.data_file = data_file
+        self.network_data = None
+    
+    def load_data(self):
+        self.network_data = pd.read_csv(self.data_file)
+    
+    def analyse_latency(self):
+        latency = self.network_data['latency']
+        average_latency = latency.mean()
+        std_latency = latency.std()
+        median_latency = latency.median()
+        latency_distribution = np.array(latency)
+        latency_distribution = StandardScaler().fit_transform(latency_distribution.reshape(-1, 1)).flatten()
+        return average_latency, std_latency, median_latency, latency_distribution
+    
+    def visualise_latency_distribution(self):
+        latency = self.network_data['latency']
+        sns.histplot(latency, kde=True, color='blue', alpha=0.7)
+        plt.xlabel('Latency')
+        plt.ylabel('Frequency')
+        plt.title('Network Latency Distribution')
+        plt.show()
+    
+    def analyse_packet_loss(self):
+        packet_loss = self.network_data['packet_loss']
+        average_packet_loss = packet_loss.mean()
+        std_packet_loss = packet_loss.std()
+        return average_packet_loss, std_packet_loss
+    
+    def preprocess_data(self):
+        # Handle missing values by dropping rows with missing data
+        self.network_data.dropna(inplace=True)
+        
+        # Handle outliers by removing values beyond a certain threshold
+        latency_threshold = 3 * self.network_data['latency'].std()
+        self.network_data = self.network_data[
+            (self.network_data['latency'] >= -latency_threshold) &
+            (self.network_data['latency'] <= latency_threshold)
+        ]
+        
+        # Normalize the 'latency' column using standardization
+        scaler = StandardScaler()
+        self.network_data['latency'] = scaler.fit_transform(self.network_data['latency'].values.reshape(-1, 1))
+        
+        # Normalize the 'packet_loss' column using min-max scaling
+        min_packet_loss = self.network_data['packet_loss'].min()
+        max_packet_loss = self.network_data['packet_loss'].max()
+        self.network_data['packet_loss'] = (self.network_data['packet_loss'] - min_packet_loss) / (max_packet_loss - min_packet_loss)
+    
+    def generate_report(self, file_path):
+        report = "Network Analysis Report\n"
+
+        # Analyze latency
+        report += "\n--- Latency Analysis ---\n"
+        average_latency, std_latency, median_latency, _ = self.analyse_latency()
+        report += f"Average Latency: {average_latency:.2f}\n"
+        report += f"Standard Deviation of Latency: {std_latency:.2f}\n"
+        report += f"Median Latency: {median_latency:.2f}\n"
+
+        # Analyze packet loss
+        report += "\n--- Packet Loss Analysis ---\n"
+        average_packet_loss, std_packet_loss = self.analyse_packet_loss()
+        report += f"Average Packet Loss: {average_packet_loss:.2f}\n"
+        report += f"Standard Deviation of Packet Loss: {std_packet_loss:.2f}\n"
+
+        with open(file_path, 'w') as file:
+            file.write(report)
+
+        print(f"Report saved to {file_path}")
+
+class NetworkAnalyserTests(unittest.TestCase):
+    def setUp(self):
+        self.analyser = NetworkAnalyser('network_performance_data.csv')
+        self.analyser.load_data()
+    
+    def test_analyse_latency(self):
+        average_latency, std_latency, median_latency, _ = self.analyser.analyse_latency()
+        self.assertIsInstance(average_latency, float)
+        self.assertIsInstance(std_latency, float)
+        self.assertIsInstance(median_latency, float)
+    
+    def test_visualise_latency_distribution(self):
+        # TODO: Add assertions to verify the correct plot is generated
+        self.analyser.visualise_latency_distribution()
+    
+    def test_analyse_packet_loss(self):
+        average_packet_loss, std_packet_loss = self.analyser.analyse_packet_loss()
+        self.assertIsInstance(average_packet_loss, float)
+        self.assertIsInstance(std_packet_loss, float)
+    
+    def test_preprocess_data(self):
+        # TODO: Add assertions to verify the correctness of data preprocessing steps
+        self.analyser.preprocess_data()
+        
+        # Verify if there are no missing values
+        self.assertFalse(self.analyser.network_data.isnull().values.any())
+        
+        # Verify if 'latency' values are within the threshold
+        latency_threshold = 3 * self.analyser.network_data['latency'].std()
+        self.assertTrue(
+            (self.analyser.network_data['latency'] >= -latency_threshold).all() and
+            (self.analyser.network_data['latency'] <= latency_threshold).all()
+        )
+        
+        # Verify if 'latency' values are standardized
+        scaler = StandardScaler()
+        scaled_latency = scaler.fit_transform(self.analyser.network_data['latency'].values.reshape(-1, 1))
+        np.testing.assert_array_almost_equal(self.analyser.network_data['latency'].values, scaled_latency.flatten())
+        
+        # Verify if 'packet_loss' values are scaled between 0 and 1
+        min_packet_loss = self.analyser.network_data['packet_loss'].min()
+        max_packet_loss = self.analyser.network_data['packet_loss'].max()
+        self.assertTrue(
+            (self.analyser.network_data['packet_loss'] >= 0).all() and
+            (self.analyser.network_data['packet_loss'] <= 1).all()
+        )
+        self.assertAlmostEqual(min_packet_loss, 0)
+        self.assertAlmostEqual(max_packet_loss, 1)
+    
+    def test_generate_report(self):
+        # TODO: Add assertions to verify the correctness and completeness of the generated report
+        file_path = 'network_analysis_report.txt'
+        self.analyser.generate_report(file_path)
+        with open(file_path, 'r') as file:
+            report = file.read()
+        self.assertIsInstance(report, str)
+        self.assertTrue(report.startswith("Network Analysis Report"))
+
+if __name__ == '__main__':
+    unittest.main()
